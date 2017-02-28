@@ -40,7 +40,6 @@ public class PickledGraphite implements GraphiteSender {
     private final Charset charset;
 
     private Socket socket;
-    private Writer writer;
     private int failures;
 
     /**
@@ -181,7 +180,7 @@ public class PickledGraphite implements GraphiteSender {
         }
 
         this.socket = socketFactory.createSocket(address.getAddress(), address.getPort());
-        this.writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), charset));
+        this.socket.setKeepAlive(true);
     }
 
     @Override
@@ -217,25 +216,24 @@ public class PickledGraphite implements GraphiteSender {
     @Override
     public void flush() throws IOException {
         writeMetrics();
-        if (writer != null) {
-            writer.flush();
-        }
+
     }
 
     @Override
     public void close() throws IOException {
         try {
             flush();
-            if (writer != null) {
-                writer.close();
-            }
+            socket.close();
         } catch (IOException ex) {
-            if (socket != null) {
-                socket.close();
-            }
+          try {
+            // if flush() is tried over a semi closed socket then
+            // IOException will be thrown. and we haven't closed the
+            // socket.
+            socket.close();
+          } catch (IOException ex2) {
+          }
         } finally {
             this.socket = null;
-            this.writer = null;
         }
     }
 
